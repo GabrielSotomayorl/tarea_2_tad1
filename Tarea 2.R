@@ -34,7 +34,7 @@ base %>%
     values_from = c(n, porcentaje),
     names_glue = "{.value}_{sexo}") %>% 
   arrange(anio)  %>% 
-  select(anio, mujer ,porcentaje_mujer , hombre ,porcentaje_hombre) %>% 
+  select(anio, n_mujer ,porcentaje_mujer , n_hombre ,porcentaje_hombre) %>% 
   replace_na(list(mujer = 0, porcentaje_mujer = 0, hombre = 0, porcentaje_hombre = 0)) %>% 
   kable(format = "html", booktabs = TRUE, 
         col.names = c("Año", "N mujeres","% Mujeres", "N hombres", "% Hombres")) %>%
@@ -73,7 +73,7 @@ base %>%
          "n_+80", "porcentaje_+80") %>% 
   mutate(across(starts_with(c("n_", "porcentaje_")), ~ifelse(is.na(.), 0, .))) %>% 
   kable(format = "html", booktabs = TRUE,
-        col.names = c("anio", 
+        col.names = c("Año", 
                       "0-4", "%",
                       "5-9","%",
                       "10-14", "%",
@@ -94,6 +94,45 @@ base %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
   save_kable(file = "tabla1b2.html")
  
+
+base <- base %>%
+  mutate(edad_cat2 = case_when(
+    edad_cat %in% c("0-4", "5-9") ~ "0-9",
+    edad_cat %in% c("10-14", "15-19") ~ "10-19",
+    edad_cat %in% c("20-24", "25-29", "30-34", "35-39") ~ "20-39",
+    edad_cat %in% c("40-44", "45-49", "50-54", "55-59") ~ "40-59",
+    TRUE ~ "60+"
+  ))
+
+base %>%
+  mutate(anio = year(fecha_notificacion)) %>%
+  group_by(anio, edad_cat2) %>%
+  tally() %>%
+  group_by(anio) %>%
+  mutate(porcentaje = round(n/sum(n) * 100,1)) %>%
+  ungroup() %>%
+  pivot_wider(
+    names_from = edad_cat2, 
+    values_from = c(n, porcentaje),
+    names_glue = "{.value}_{edad_cat2}") %>% 
+  arrange(anio)  %>% 
+  select("anio", 
+         "n_0-9", "porcentaje_0-9",
+         "n_10-19", "porcentaje_10-19",
+         "n_20-39", "porcentaje_20-39",
+         "n_40-59", "porcentaje_40-59",
+         "n_60+", "porcentaje_60+") %>% 
+  mutate(across(starts_with(c("n_", "porcentaje_")), ~ifelse(is.na(.), 0, .))) %>% 
+  kable(format = "html", booktabs = TRUE,
+        col.names = c("Año", 
+                      "0-9", "%",
+                      "10-19","%",
+                      "20-39", "%",
+                      "40-59", "%",
+                      "60+", "%")) %>%
+  kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
+  save_kable(file = "tabla1b2.2.html")
+
 #1c
 base %>%
    mutate(quin = cut(year(fecha_notificacion),c(1995,1999,2004,2009,2014,2022),include.lowest = T))  %>%
@@ -170,13 +209,27 @@ base %>%
   save_kable(file = "tabla1d1.html")
 
 
-ggplot(base, aes(x = difdias)) +
-  geom_histogram(binwidth = 1, fill = "skyblue", color = "black", alpha = 0.7) +
-  labs(title = "Days between First Symptoms and Notification",
-       x = "Number of Days",
-       y = "Frequency") +
-  theme_minimal()
 
+p1 <- ggplot(base, aes(x = difdias)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  xlab("Diferencia de días") +
+  ggtitle("Gráfico de densidad de la diferencia de días")
+
+p2 <- ggplot(base[scale(base$difdias)<1&scale(base$difdias)>-1,], aes(x = difdias)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  xlab("Diferencia de días") +
+  ggtitle("Gráfico de densidad de la diferencia de días (sin atipicos)")
+
+grid.arrange(p1, p2, ncol = 1)
+
+base %>%
+  mutate(scaled_difdias = scale(difdias)) %>%
+  filter(scaled_difdias > 1 | difdias < 0) %>%
+  select(fecha_notificacion, fecha_primeros_sintomas, difdias) %>%
+  arrange(difdias) %>%
+  kable(format = "html", booktabs = TRUE) %>%
+  kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
+  save_kable(file = "tabla1d2.html")
 
 
 #Bonus 
