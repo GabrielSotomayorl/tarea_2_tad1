@@ -387,12 +387,6 @@ base %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
   save_kable(file = "tabla1d2.html")
 
-T4 <- base %>%
-  mutate(Diferencia_de_Dias = as.numeric(fecha_notificacion-fecha_primeros_sintomas)) %>%
-  arrange(desc(Diferencia_de_Dias))
-
-print(T4)
-
 # Medidas de tendencia central:
 
 promedio <- mean(T4$Diferencia_de_Dias)
