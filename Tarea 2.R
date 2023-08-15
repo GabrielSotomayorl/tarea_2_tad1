@@ -1,9 +1,14 @@
-#Limpiar el ambiente
+# Tarea 2
+
+#Primero, debemos limpiar el ambient:
+
 gc()
 rm(list=ls())
 
 if (!require(pacman)) install.packages("pacman")
 library(pacman)
+
+# Instalamos los paquetes que usaremos en la tarea:
 
 pacman::p_load(tidyverse,
                readxl, 
@@ -11,17 +16,109 @@ pacman::p_load(tidyverse,
                kableExtra,
                gridExtra
                )
+#---------------------------------------------------------------------------------------------------------
+#Ejercicio 1
 
-#1a
+# 1.A) Importe su tabla de datos e indique cuántas infecciones por Hantavirus se
+# han registrado a la fecha. Explique cuál es la unidad de análisis de estos 
+# datos ¿La tabla esta compuesta por personas únicas o hay duplicados? 
+# Explique que sería un duplicado en este caso.
+
+# Importamos la tabla de datos con la que vamos a trabajar:
 base <- read_excel("Hantavirus_chile.xlsx")
 
+# El numero de infecciones por hantavirus registrada se calcula contando el numero
+# de filas que tenemos en la base de datos:
+
 nrow(base)
+
+# Al revisar la base de datos podemos notar que no existe una clave principal
+# que identifique claramente a cada individuo diagnosticado con Hantavirus, por
+# lo tanto debemos considerar la fila completa como clave primaria para poder
+# considerar cada caso como un contagio.
+
+# Ahora, para revisar si existen duplicados, contaremos el numero de filas pero 
+# tomando en cuenta solo valores unicos con el siguiente comando:
+
+n_distinct(base)
+
+# Podemos notar que existiria un dato duplicado. Para saber cual es, debemos
+# realizar el siguiente codigo:
+
 base %>% 
   filter(duplicated(base)==T)
 
-colnames(base)
+# Como podemos confirmar, la tabla tiene dos observaciones iguales. Este valor podría 
+# ser considerado como duplicado debido a que la probabilidad
+# de que 2 individuos cuenten con la misma informacion es muy baja.
+#-------------------------------------------------------------------------------------------------------------------------------
+# 1.B) Construya dos tablas con los porcentajes de 1) infecciones de hantavirus por 
+# año desagregado por sexo y 2) infecciones de hantavirus por año desagregado por
+# grupo etarios2. ¿Qué le podría comentar al Ministerio de Salud respecto a sus 
+# resultados?
 
-#1b
+# Para la primera tabla tomaremos la base de datos y agruparemos por año (tomado de la fecha
+# de notificación) y el sexo, para contabilizar el número de contagios con la columna diagnóstico
+# y aplicamos un calcula para convertir este ultimo también en porcentaje.
+
+T1 <- base %>%
+  group_by(Año=year(fecha_notificacion), Sexo=sexo) %>%
+  summarize(N = length(diagnostico)) %>%
+  mutate("%" = (N / sum(N)) * 100)
+
+# Visualizamso la tabla 1:
+
+print(T1, n=55)
+
+# Además, aplicaremos visualización con un gráfico de líneas para identificar la cantidad de casos 
+# por género que hubo durante los periodos señalados. Para ello usaremos el paquete ggplot.
+
+G1 <- ggplot(T1, aes(x = Año, y = N, color=Sexo)) +
+  geom_line() +
+  geom_point() +
+  labs(title = paste("Infecciones de hantavirus por año desagregado por sexo"),
+       x = "Año",
+       y = "N") +
+  scale_color_manual(values = c("hombre"="blue", "mujer"="red"))
+
+# Visualizamos el gráfico 1:
+
+print(G1)
+
+# Para la segunda tabla, haremos un proceso similar en donde tomaremos la base de datos,
+# agruparemos por año y grupo etáreo, contabilizaremos los casos según el número de 
+# observaciones en la columna diagnóstico y también aplicaremos un comando para generar
+# el porcentaje de esa cifra.
+
+T2 <- base %>%
+  group_by(Año=year(fecha_notificacion), edad_cat) %>%
+  summarize(N= length(diagnostico)) %>%
+  mutate("%" = (N / sum(N)) * 100)
+
+# Visualizamos la tabla2:
+
+print(T2, n=340)
+
+# Diseñaremos también un grafico de líneas para poder visualizar mejor el comportamiento de 
+# la variable en los rangos etáreos y cómo les afecta el virus. Asiganmos un color a cada 
+# rango.
+
+G2 <- ggplot(T2, aes(x = Año, y = N, color=edad_cat)) +
+  geom_line() +
+  geom_point() +
+  labs(title = paste("Infecciones de hantavirus por año desagregado por grupo etario"),
+       x = "Año",
+       y = "N")+   
+  scale_color_manual(values = c("+80"="blue", "0-4"="red", "10-14"="yellow", 
+  "15-19"="black", "20-24"="pink", "25-29"="green", "30-34"="brown", 
+  "35-39"="purple", "40-44"="magenta", "45-49"="lightblue", "50-54"="grey", 
+  "55-59"="darkblue", "5-9"="darkred", "60-64"="darkgreen", "65-69"="darkorange",
+  "70-74"="darkmagenta", "75-79"="aquamarine4"))
+
+# Visualizamos el gráfico 2:
+
+print(G2)
+
 base %>%
   mutate(anio = year(fecha_notificacion)) %>%
   group_by(anio, sexo) %>%
@@ -132,13 +229,39 @@ base %>%
                       "60+", "%")) %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
   save_kable(file = "tabla1b2.2.html")
+#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# 1.C) Construya una tabla con el número de casos por región (region_residencia) 
+# agrupando cada 5 años. Indique la región con el mayor cantidad de casos en el 
+# tiempo y realice un zoom para identificar las comunas más críticas (mayor 
+# número de casos totales) para esa región ¿Qué input relevante le podría 
+# indicar al Ministerio de Salud? ¿Dónde podríamos tener una mayor vigilancia?
 
-#1c
+# Para generar una tabla de casos por región en periodos agrupados de 5 años, primero definiremos
+# el objeto "Periodo" para contar con los años de los contagios y luego, aplicaremos el siguiente
+# comando que usará "Periodo" como input:
+
+Periodo <- as.Date(base$fecha_notificacion)
+
+T3 <-base %>%
+  mutate(year = lubridate::year(fecha_notificacion)) %>%
+  mutate(Periodo = paste0((year %/% 5) * 5, "-", ((year %/% 5) * 5 + 4))) %>%
+  group_by("Region"=region_residencia, Periodo) %>%
+  summarise(N = n()) %>%
+  arrange("Region")
+
+# Mostrar la tabla 3:
+
+print(T3, n=70)
+
 base %>%
    mutate(quin = cut(year(fecha_notificacion),c(1995,1999,2004,2009,2014,2022),include.lowest = T))  %>%
    group_by(region_residencia,quin) %>%
    count() %>%
    arrange(-n) 
+
+# Ahora, para poder identificar cual es la región con la mayor cantidad de casos durante estos periodos,
+# debemos sumar la recurrencia de aquellas zonas pero sin separa por años y ordenar de manera descendiente 
+# para encontrar rápidamente la región con más casos. Tal como se ve a continuación:
 
 base %>%
   mutate(quin = cut(year(fecha_notificacion),c(1995,1999,2004,2009,2014,2022),include.lowest = T))  %>%
@@ -170,9 +293,8 @@ base %>%
    kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
    save_kable(file = "tabla1c1.html")
  
- 
- 
- #comunas
+# Al hacer un zoom en la Región de Los Lagos, con mayor nivel de recurrencia, podemos ver que las comunas
+# más afectadas son:
 
  base %>%
    filter(region_residencia == "Region de Los Lagos") %>%
@@ -186,12 +308,28 @@ base %>%
    kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
    save_kable(file = "tabla1c2.html")
  
- 
- #1d
- 
-base<- base %>%
-   mutate(difdias= as.numeric(difftime(fecha_notificacion, fecha_primeros_sintomas, units = "days"))) 
+# 1.D) Una preocupación importante del MINSAL es comprender la dinámica entre el
+# tiempo en que aparecen los primeros síntomas y la notificación de los casos a 
+# las autoridades. Construya una variable nueva que represente el número de días
+# entre la notificación y la aparición de los primeros sintomas. Luego realice 
+# un análisis descriptivos (medidas de tendencia central, dispersión y posición)
+# de su variable de interés. Puede presentar una figura si es que lo estima
+# conveniente. ¿Qué puede decir respecto a los tiempos de notificación de casos 
+# de Hantavirus en Chile? Sea breve. Puede apoyarse de la función difftime() u 
+# otra que estime conveniente.
 
+# Primero agregaremos la nueva columan que señalara la diferencia de días que existe desde que
+# se comienza con los síntomas hasta que la entidad médica es notificada del contagio.
+
+base<- base %>%
+   mutate(difdias= as.numeric(difftime(fecha_notificacion,fecha_primeros_sintomas, units = "days"))) %>%
+   arrange(desc(difdias))
+
+# Para visualizar esta nueva tabla:
+print(base)
+
+# Luego, realizamos un análisis descriptivo de la misma para poder comprender mejor el 
+# comportamiento de esta nueva variable.
 
 base %>% 
    summarize(
@@ -208,7 +346,8 @@ base %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
   save_kable(file = "tabla1d1.html")
 
-
+# Luego graficamos para poder tener una mejor visualización de la variable y su
+# comportamiento: 
 
 p1 <- ggplot(base, aes(x = difdias)) +
   geom_density(fill = "blue", alpha = 0.5) +
@@ -231,7 +370,80 @@ base %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
   save_kable(file = "tabla1d2.html")
 
+T4 <- base %>%
+  mutate(Diferencia_de_Dias = as.numeric(fecha_notificacion-fecha_primeros_sintomas)) %>%
+  arrange(desc(Diferencia_de_Dias))
 
+print(T4)
+
+# Medidas de tendencia central:
+
+promedio <- mean(T4$Diferencia_de_Dias)
+Mediana <- median(T4$Diferencia_de_Dias)
+Moda <- as.numeric(names(table(T4$Diferencia_de_Dias)[table(T4$Diferencia_de_Dias) == 
+                                                        max(table(T4$Diferencia_de_Dias))]))
+G4 <- plot(base$Diferencia_de_Dias, pch = 19, col = "blue", xlab = "Índice", 
+           ylab = "Valor", main = "Diferencia de dias")
+
+# Agregar líneas verticales para el promedio, la mediana y la moda
+abline(h = promedio, col = "red", lty = 2, lwd = 2)
+abline(h = Mediana, col = "green", lty = 3, lwd = 2)
+abline(h = Moda, col = "purple", lty = 4, lwd = 2)
+
+# Agregar leyenda
+legend("topright", legend = c("Promedio", "Mediana", "Moda"),
+       col = c("red", "green", "purple"), lty = 2:4, lwd = 2, cex = 0.8)
+#--------------------------------------------------------------------------------------------------------------------------------
+# EJERCICO 2
+
+gdp <- WDI(
+  country = "all",
+  indicator = "NY.GDP.PCAP.PP.KD",
+  start = 2015,
+  end = 2020,
+  extra = TRUE,
+  cache = NULL,
+  latest = NULL,
+  language = "es") %>%
+  filter(region=="Latin America & Caribbean" & year==2020)
+
+print(gdp)
+
+glimpse(gdp)
+
+mean(gdp$NY.GDP.PCAP.PP.KD, na.rm = TRUE)
+
+muestreo <- function(v, m, n, replace = TRUE) {
+  library(dplyr)
+  library(ggplot2)
+  library(patchwork)
+  vector_promedios <- c()
+  for(i in 1:m) {
+    muestra <- sample(x = v,
+                      size = n,
+                      replace = TRUE)
+    vector_promedios[i] <- mean(muestra, na.rm=TRUE)
+  }
+  promedio <- mean(vector_promedios, na.rm=TRUE)
+  g1 <- ggplot(data = NULL, aes(x = 1:m, y = vector_promedios)) +
+    geom_point(color = "darkblue") + geom_line(color = "blue") +
+    geom_hline(yintercept = mean(v, na.rm=TRUE), color = "red", lwd = 1) + #Promedio real
+    geom_hline(yintercept = promedio, color = "green", lwd = 1) #Gran media
+  g2 <- ggplot(data = NULL, aes(x = vector_promedios)) +
+    geom_histogram(bins = 100, fill="darkblue") +
+    geom_vline(xintercept = mean(v, na.rm=TRUE), color = "red", lwd = 1) +
+    geom_vline(xintercept = promedio, color = "green", lwd = 1)
+  grafico <- g1/g2
+  print(paste0("Promedios de ", m, " muetras de tamaño ", n, ":"))
+  print(vector_promedios)
+  print(paste0("Promedio de promedios (Gran media): ", promedio))
+  print(paste0("Promedio 'verdadero': ", mean(v, na.rm=TRUE)))
+  print(grafico)
+}
+
+muestreo(v=gdp$NY.GDP.PCAP.PP.KD, m=200, n=5, replace = TRUE)
+
+#----------------------------------------------------------------------------------------------------------------------------------
 #Bonus 
 
 mapa_reg<-mapa_comunas %>% 
