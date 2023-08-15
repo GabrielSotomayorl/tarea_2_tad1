@@ -387,13 +387,13 @@ base %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
   save_kable(file = "tabla1d2.html")
 
-# Medidas de tendencia central:
+# Gráfico medidas de tendencia central:
 
-promedio <- mean(T4$Diferencia_de_Dias)
-Mediana <- median(T4$Diferencia_de_Dias)
-Moda <- as.numeric(names(table(T4$Diferencia_de_Dias)[table(T4$Diferencia_de_Dias) == 
-                                                        max(table(T4$Diferencia_de_Dias))]))
-G4 <- plot(T4$Diferencia_de_Dias, pch = 19, col = "blue", xlab = "Índice", 
+promedio <- mean(base$difdias)
+Mediana <- median(base$difdias)
+Moda <- as.numeric(names(table(base$difdias)[table(base$difdias) == 
+                                                        max(table(base$difdias))]))
+G3 <- plot(base$difdias, pch = 19, col = "blue", xlab = "Índice", 
            ylab = "Valor", main = "Diferencia de dias")
 
 # Agregar líneas verticales para el promedio, la mediana y la moda
@@ -531,4 +531,3 @@ for (i in seq_along(levels(mapa$quin))) {
 }
 
 grid.arrange(grobs = graficos, ncol = 3, top = "Casos de antavirus por región según años")
-
