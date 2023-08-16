@@ -1,12 +1,11 @@
 # Tarea 2
 
-#Primero, debemos limpiar el ambient:
+#Primero, debemos limpiar el ambiente:
 
 gc()
 rm(list=ls())
 
 if (!require(pacman)) install.packages("pacman")
-library(pacman)
 
 # Instalamos los paquetes que usaremos en la tarea:
 
@@ -51,7 +50,8 @@ n_distinct(base)
 # realizar el siguiente código:
 
 base %>% 
-  filter(duplicated(base)==T)
+  filter(duplicated(base)==T) %>% 
+  View()
 
 # Como podemos confirmar, la tabla tiene dos observaciones iguales. Este valor podría 
 # ser considerado como duplicado debido a que la probabilidad
@@ -67,20 +67,35 @@ base %>%
 # Para la primera tabla tomaremos la base de datos y agruparemos por año (tomado de la fecha
 # de notificación) y el sexo, para contabilizar el número de contagios con la columna diagnóstico
 # y aplicamos un calcula para convertir este último también en porcentaje.
+# Luego pasaremos la tabla a formato ancho para facilitar su  visualización y la exportaremos como html
 
-T1 <- base %>%
-  group_by(Año=year(fecha_notificacion), Sexo=sexo) %>%
-  summarize(N = length(diagnostico)) %>%
-  mutate("%" = (N / sum(N)) * 100)
-
-# Visualizamos la tabla 1:
-
-print(T1, n=55)
+base %>%
+  mutate(anio = year(fecha_notificacion)) %>%
+  group_by(anio, sexo) %>%
+  tally() %>%
+  group_by(anio) %>%
+  mutate(porcentaje = round(n/sum(n) * 100,1)) %>%
+  ungroup() %>%
+  pivot_wider(
+    names_from = sexo, 
+    values_from = c(n, porcentaje),
+    names_glue = "{.value}_{sexo}") %>% 
+  arrange(anio)  %>% 
+  select(anio, n_mujer ,porcentaje_mujer , n_hombre ,porcentaje_hombre) %>% 
+  replace_na(list(n_mujer = 0, porcentaje_mujer = 0, n_hombre = 0, porcentaje_hombre = 0)) %>% 
+  kable(format = "html", booktabs = TRUE, 
+        col.names = c("Año", "N mujeres","% Mujeres", "N hombres", "% Hombres")) %>%
+  kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
+  save_kable(file = "tabla1b1.html")
 
 # Además, aplicaremos visualización con un gráfico de líneas para identificar la cantidad de casos 
 # por género que hubo durante los periodos señalados. Para ello usaremos el paquete ggplot.
 
-G1 <- ggplot(T1, aes(x = Año, y = N, color=Sexo)) +
+G1 <- ggplot(base %>%
+               group_by(Año=year(fecha_notificacion), Sexo=sexo) %>%
+               summarize(N = length(diagnostico)) %>%
+               mutate("%" = (N / sum(N)) * 100)
+             , aes(x = Año, y = N, color=Sexo)) +
   geom_line() +
   geom_point() +
   labs(title = paste("Infecciones de hantavirus por año desagregado por sexo"),
@@ -96,54 +111,9 @@ print(G1)
 # agruparemos por año y grupo etario, contabilizaremos los casos según el número de 
 # observaciones en la columna diagnóstico y también aplicaremos un comando para generar
 # el porcentaje de esa cifra.
+# Luego pasaremos la tabla a formato ancho para facilitar su  visualización y la exportaremos como html
 
-T2 <- base %>%
-  group_by(Año=year(fecha_notificacion), edad_cat) %>%
-  summarize(N= length(diagnostico)) %>%
-  mutate("%" = (N / sum(N)) * 100)
 
-# Visualizamos la tabla2:
-
-print(T2, n=340)
-
-# Diseñaremos también un gráfico de líneas para poder visualizar mejor el comportamiento de 
-# la variable en los rangos etarios y cómo les afecta el virus. Asignamos un color a cada 
-# rango.
-
-G2 <- ggplot(T2, aes(x = Año, y = N, color=edad_cat)) +
-  geom_line() +
-  geom_point() +
-  labs(title = paste("Infecciones de hantavirus por año desagregado por grupo etario"),
-       x = "Año",
-       y = "N")+   
-  scale_color_manual(values = c("+80"="blue", "0-4"="red", "10-14"="yellow", 
-                                "15-19"="black", "20-24"="pink", "25-29"="green", "30-34"="brown", 
-                                "35-39"="purple", "40-44"="magenta", "45-49"="lightblue", "50-54"="grey", 
-                                "55-59"="darkblue", "5-9"="darkred", "60-64"="darkgreen", "65-69"="darkorange",
-                                "70-74"="darkmagenta", "75-79"="aquamarine4"))
-
-# Visualizamos el gráfico 2:
-
-print(G2)
-
-base %>%
-  mutate(anio = year(fecha_notificacion)) %>%
-  group_by(anio, sexo) %>%
-  tally() %>%
-  group_by(anio) %>%
-  mutate(porcentaje = round(n/sum(n) * 100,1)) %>%
-  ungroup() %>%
-  pivot_wider(
-    names_from = sexo, 
-    values_from = c(n, porcentaje),
-    names_glue = "{.value}_{sexo}") %>% 
-  arrange(anio)  %>% 
-  select(anio, n_mujer ,porcentaje_mujer , n_hombre ,porcentaje_hombre) %>% 
-  replace_na(list(mujer = 0, porcentaje_mujer = 0, hombre = 0, porcentaje_hombre = 0)) %>% 
-  kable(format = "html", booktabs = TRUE, 
-        col.names = c("Año", "N mujeres","% Mujeres", "N hombres", "% Hombres")) %>%
-  kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
-  save_kable(file = "tabla1b1.html")
 
 base %>%
   mutate(anio = year(fecha_notificacion)) %>%
@@ -197,6 +167,8 @@ base %>%
                       "+80", "%")) %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
   save_kable(file = "tabla1b2.html")
+
+#creamos versión resumida de la varaible de tramos para facilitar la presentación de la tabla.
 base <- base %>%
   mutate(edad_cat2 = case_when(
     edad_cat %in% c("0-4", "5-9") ~ "0-9",
@@ -235,36 +207,53 @@ base %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
   save_kable(file = "tabla1b2.2.html")
 
+
+# Diseñaremos también un gráfico de líneas para poder visualizar mejor el comportamiento de 
+# la variable en los rangos etarios y cómo les afecta el virus. Asignamos un color a cada 
+# rango.
+
+G2 <- ggplot(base %>%
+               group_by(Año=year(fecha_notificacion), edad_cat) %>%
+               summarize(N= length(diagnostico)) %>%
+               mutate("%" = (N / sum(N)) * 100), aes(x = Año, y = N, color=edad_cat)) +
+  geom_line() +
+  geom_point() +
+  labs(title = paste("Infecciones de hantavirus por año desagregado por grupo etario"),
+       x = "Año",
+       y = "N")+   
+  scale_color_manual(values = c("+80"="blue", "0-4"="red", "10-14"="yellow", 
+                                "15-19"="black", "20-24"="pink", "25-29"="green", "30-34"="brown", 
+                                "35-39"="purple", "40-44"="magenta", "45-49"="lightblue", "50-54"="grey", 
+                                "55-59"="darkblue", "5-9"="darkred", "60-64"="darkgreen", "65-69"="darkorange",
+                                "70-74"="darkmagenta", "75-79"="aquamarine4"))
+
+# Visualizamos el gráfico 2:
+
+print(G2)
+
+
+
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# 1.C) Construya una tabla con el número de casos por región (region_residencia) 
-# agrupando cada 5 años. Indique la región con la mayor cantidad de casos en el 
-# tiempo y realice un zoom para identificar las comunas más críticas (mayor 
-# número de casos totales) para esa región ¿Qué input relevante le podría 
-# indicar al Ministerio de Salud? ¿Dónde podríamos tener una mayor vigilancia?
+# 1.C)
 
-# Para generar una tabla de casos por región en periodos agrupados de 5 años, primero definiremos
-# el objeto "Periodo" para contar con los años de los contagios y luego, aplicaremos el siguiente
-# comando que usará "Periodo" como input:
-
-Periodo <- as.Date(base$fecha_notificacion)
-
-T3 <-base %>%
-  mutate(year = lubridate::year(fecha_notificacion)) %>%
-  mutate(Periodo = paste0((year %/% 5) * 5, "-", ((year %/% 5) * 5 + 4))) %>%
-  group_by("Region"=region_residencia, Periodo) %>%
-  summarise(N = n()) %>%
-  arrange("Region")
-
-# Mostrar la tabla 3:
-
-print(T3, n=70)
+# Para generar una tabla de casos por región en periodos agrupados en los periodos señalados
+# primero crearemos los tramos señalados 
+base<- base %>%
+  mutate(quin = cut(year(fecha_notificacion),c(1995,1999,2004,2009,2014,2022),include.lowest = T)) 
+base$quin<-factor(base$quin, levels(base$quin), labels = c("1995-1999" ,
+                                                           "2000-2004", "2005-2009" 
+                                                           ,"2010-2014", "2015-2022"))
 
 base %>%
-  mutate(quin = cut(year(fecha_notificacion),c(1995,1999,2004,2009,2014,2022),include.lowest = T))  %>%
   group_by(region_residencia,quin) %>%
   count() %>%
-  arrange(-n) 
+  arrange(region_residencia) %>% 
+  kable(format = "html", booktabs = TRUE, 
+        col.names = c("Región", "Periodo","N")) %>%
+  kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
+  save_kable(file = "tabla1c1.html")
+
 
 # Ahora, para poder identificar cual es la región con la mayor cantidad de casos durante estos periodos,
 # debemos sumar la recurrencia de aquellas zonas, pero sin separar por años y ordenar de manera descendiente 
@@ -274,7 +263,12 @@ base %>%
   mutate(quin = cut(year(fecha_notificacion),c(1995,1999,2004,2009,2014,2022),include.lowest = T))  %>%
   group_by(region_residencia) %>%
   count() %>%
-  arrange(-n) 
+  arrange(-n) %>% 
+  kable(format = "html", booktabs = TRUE, 
+        col.names = c("Región", "N")) %>%
+  kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
+  save_kable(file = "tabla1c2.html")
+
 
 base %>%
   mutate(quin = cut(year(fecha_notificacion),c(1995,1999,2004,2009,2014,2022),include.lowest = T)) %>%
@@ -286,29 +280,22 @@ base %>%
   ungroup()
 
 base %>%
-  mutate(quin = cut(year(fecha_notificacion),c(1995,1999,2004,2009,2014,2022),include.lowest = T))  %>%
   group_by(quin, region_residencia) %>%
   count() %>%
   arrange(region_residencia) %>%
   filter(region_residencia == "Region de Los Lagos") %>% 
-  mutate(quin= gsub("\\[|\\]","" ,quin) %>%
-           gsub("\\(", "" ,.) %>%
-           gsub("\\)", "" ,.) %>%
-           gsub(",", "-" ,.)) %>% 
   kable(format = "html", booktabs = TRUE, 
         col.names = c("Período", "Región","N")) %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
-  save_kable(file = "tabla1c1.html")
+  save_kable(file = "tabla1c3.html")
 
-# Al hacer un zoom en la Región de Los Lagos, con mayor nivel de recurrencia, podemos ver que las comunas
-# más afectadas son:
 
-Casos_totales_comunas_RdlL <- base %>%
-  group_by(region_residencia="Region de Los Lagos ", comuna_residencia) %>%
-  summarize(N = length(diagnostico))%>%  
-  arrange(desc(N))
-
-head(Casos_totales_comunas_RdlL, 5)
+# Al hacer un zoom en la Región de Los Lagos, con mayor cantidad de casos. Para esto 
+# debemos filtrar solo los casos que corresponden a la regiuón de los lagos, 
+# y luego agruparlos por comuna. La variable comuna tiene problemas de registro
+# al tener las mismas comunas con distintas mayusuculas/minusculas. Homogenizamos esto para que se 
+# agrupen ocrrectamente yu seleccionamos las 10 comunas con más casos. Luego exportamos en 
+# formato html
 
 base %>%
   filter(region_residencia == "Region de Los Lagos") %>%
@@ -320,30 +307,18 @@ base %>%
   kable(format = "html", booktabs = TRUE, 
         col.names = c("Comuna","N")) %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
-  save_kable(file = "tabla1c2.html")
+  save_kable(file = "tabla1c4.html")
 
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# 1.D) Una preocupación importante del MINSAL es comprender la dinámica entre el
-# tiempo en que aparecen los primeros síntomas y la notificación de los casos a 
-# las autoridades. Construya una variable nueva que represente el número de días
-# entre la notificación y la aparición de los primeros síntomas. Luego realice 
-# un análisis descriptivo (medidas de tendencia central, dispersión y posición)
-# de su variable de interés. Puede presentar una figura si es que lo estima
-# conveniente. ¿Qué puede decir respecto a los tiempos de notificación de casos 
-# de Hantavirus en Chile? Sea breve. Puede apoyarse de la función difftime() u 
-# otra que estime conveniente.
-
+# 1.D) 
 # Primero agregaremos la nueva columna que señalara la diferencia de días que existe desde que
 # se comienza con los síntomas hasta que la entidad médica es notificada del contagio.
 
 base<- base %>%
   mutate(difdias= as.numeric(difftime(fecha_notificacion,fecha_primeros_sintomas, units = "days"))) %>%
   arrange(desc(difdias))
-
-# Para visualizar esta nueva tabla:
-print(base)
 
 # Luego, realizamos un análisis descriptivo de la misma para poder comprender mejor el 
 # comportamiento de esta nueva variable.
@@ -359,7 +334,7 @@ base %>%
     max = max(difdias, na.rm = TRUE)
   ) %>% 
   kable(format = "html", booktabs = TRUE,
-        col.names = c("Media","Mediana","SD","Q1","Q2","Mínimo","Máximo")) %>%
+        col.names = c("Media","Mediana","SD","Q1","Q3","Mínimo","Máximo")) %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
   save_kable(file = "tabla1d1.html")
 
@@ -383,29 +358,12 @@ base %>%
   filter(scaled_difdias > 1 | difdias < 0) %>%
   select(fecha_notificacion, fecha_primeros_sintomas, difdias) %>%
   arrange(difdias) %>%
-  kable(format = "html", booktabs = TRUE) %>%
+  filter(difdias > 250|difdias< -250) %>% 
+   kable(format = "html", booktabs = TRUE) %>%
   kable_styling(full_width = FALSE, latex_options = "striped", font_size = 12) %>%
   save_kable(file = "tabla1d2.html")
 
-# Gráfico medidas de tendencia central:
-
-promedio <- mean(base$difdias)
-Mediana <- median(base$difdias)
-Moda <- as.numeric(names(table(base$difdias)[table(base$difdias) == 
-                                                        max(table(base$difdias))]))
-G3 <- plot(base$difdias, pch = 19, col = "blue", xlab = "Índice", 
-           ylab = "Valor", main = "Diferencia de dias")
-
-# Agregar líneas verticales para el promedio, la mediana y la moda
-abline(h = promedio, col = "red", lty = 2, lwd = 2)
-abline(h = Mediana, col = "green", lty = 3, lwd = 2)
-abline(h = Moda, col = "purple", lty = 4, lwd = 2)
-
-# Agregar leyenda
-legend("topright", legend = c("Promedio", "Mediana", "Moda"),
-       col = c("red", "green", "purple"), lty = 2:4, lwd = 2, cex = 0.8)
-
-#--------------------------------------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 
 # Ejercicio 2
 
@@ -456,8 +414,7 @@ muestreo <- function(v, m, n, replace = TRUE) {
 
 muestreo(v=gdp$NY.GDP.PCAP.PP.KD, m=200, n=5, replace = TRUE)
 
-#--------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
+#-------------------------------------------------------------------------
 # Bonus 
 
 mapa_reg<-mapa_comunas %>% 
@@ -507,10 +464,7 @@ graficos <- list() # Inicializa una lista vacía para almacenar los gráficos
 
 
 for (i in seq_along(levels(mapa$quin))) {
-  periodo <- gsub("\\[|\\]","" ,levels(mapa$quin)[i]) %>%
-    gsub("\\(", "" ,.) %>%
-    gsub("\\)", "" ,.) %>%
-    gsub(",", "-" ,.)
+  periodo <- c("1995-2004","2005-2014","2015-2022")[i]
   
   g <- ggplot(mapa[mapa$quin == levels(mapa$quin)[i],]) + 
     geom_sf(aes(fill = n, geometry = geometry)) +
